@@ -21,6 +21,7 @@ This simple yet powerful web app helps users monitor water intake, set goals, an
 * **React.js/Next.js**
 * **Tailwind CSS**
 * **JavaScript (ES6)**
+* TypeScript**
 * **LocalStorage** for data persistence
 
 ---
