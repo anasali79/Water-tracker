@@ -31,7 +31,7 @@ This simple yet powerful web app helps users monitor water intake, set goals, an
 ```bash
 # 1. Clone the repository
 git clone https://github.com/anasali79/Water-tracker.git
-cd water-intake-tracker
+cd water-tracker
 
 # 2. Install dependencies
 npm install
