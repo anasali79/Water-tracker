@@ -17,6 +17,7 @@ import { StatisticsCard } from "@/components/StatisticsCard"
 import { SettingsPanel } from "@/components/SettingsPanel"
 import { WaterDropAnimation } from "@/components/WaterDropAnimation"
 import { Toast } from "@/components/Toast"
+import { MobileAlert } from "@/components/MobileAlert"
 
 export default function WaterTracker() {
   const [showWaterDrop, setShowWaterDrop] = useState(false)
@@ -42,20 +43,36 @@ export default function WaterTracker() {
     setNotificationsEnabled,
     reminderInterval,
     setReminderInterval,
+    visualAlertsEnabled,
+    setVisualAlertsEnabled,
+    vibrationEnabled,
+    setVibrationEnabled,
     lastNotification,
+    nextReminderTime,
+    showMobileAlert,
+    deviceIsMobile,
+    deviceSupportsVibration,
+    notificationSupport,
     requestNotificationPermission,
     sendNotification,
     sendTestNotification,
     updateNotificationSettings,
+    dismissMobileAlert,
+    vibrateDevice,
   } = useNotifications(currentUserId)
 
   const todayData = getTodayData()
   const recentDays = getRecentDays()
 
+ 
   const addWater = (amount: number, unit: string, message?: string) => {
     console.log(`🎯 UI: Adding water ${amount}${unit} for ${currentUser?.name}`)
     originalAddWater(amount, unit, message)
     setShowWaterDrop(true)
+
+    if (deviceIsMobile) {
+      vibrateDevice([50, 30, 50])
+    }
 
     const unitName = unit === "ml" ? "ml" : unit === "l" ? "L" : unit === "cups" ? "cups" : "fl oz"
     const toastMessage = message ? `Added ${amount}${unitName} - "${message}" 💧` : `Added ${amount}${unitName} 💧`
@@ -63,7 +80,11 @@ export default function WaterTracker() {
     showToast(toastMessage, "success", 2000)
   }
 
-  
+ 
+  const quickAddFromAlert = () => {
+    addWater(250, "ml", "Quick hydration reminder")
+  }
+
   const setDailyGoal = (goal: number) => {
     if (currentUser) {
       updateUser(currentUser.id, { dailyGoal: goal })
@@ -88,7 +109,7 @@ export default function WaterTracker() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-cyan-50 p-4">
       <div className="max-w-4xl mx-auto space-y-6">
-      
+        
         <div className="text-center space-y-2 animate-fade-in-up">
           <div className="flex items-center justify-center gap-2">
             <Droplets className="h-8 w-8 text-blue-500 animate-pulse-gentle" />
@@ -98,7 +119,7 @@ export default function WaterTracker() {
           {currentUser && <p className="text-sm text-blue-600 font-medium">Welcome back, {currentUser.name}! 👋</p>}
         </div>
 
-       
+      
         <div className="animate-fade-in-up">
           <UserSelector
             users={users}
@@ -157,26 +178,36 @@ export default function WaterTracker() {
               setDailyGoal={setDailyGoal}
               waterData={waterData}
               notificationsEnabled={notificationsEnabled}
-              setNotificationsEnabled={(enabled) => {
-                updateNotificationSettings(enabled)
-                showToast(enabled ? "Notifications enabled! 🔔" : "Notifications disabled 🔕", "info")
-              }}
+              setNotificationsEnabled={setNotificationsEnabled}
               reminderInterval={reminderInterval}
-              setReminderInterval={(interval) => {
-                updateNotificationSettings(notificationsEnabled, interval)
-                showToast(`Reminder interval set to ${interval} minutes ⏰`, "info")
-              }}
+              setReminderInterval={setReminderInterval}
+              visualAlertsEnabled={visualAlertsEnabled}
+              setVisualAlertsEnabled={setVisualAlertsEnabled}
+              vibrationEnabled={vibrationEnabled}
+              setVibrationEnabled={setVibrationEnabled}
+              deviceIsMobile={deviceIsMobile}
+              deviceSupportsVibration={deviceSupportsVibration}
+              notificationSupport={notificationSupport}
+              nextReminderTime={nextReminderTime}
               onRequestNotificationPermission={requestNotificationPermission}
               onSendTestNotification={sendTestNotification}
+              onUpdateNotificationSettings={updateNotificationSettings}
               todayData={todayData}
             />
           </TabsContent>
         </Tabs>
 
-       
+     
+        <MobileAlert
+          show={showMobileAlert}
+          todayData={todayData}
+          onDismiss={dismissMobileAlert}
+          onAddWater={quickAddFromAlert}
+        />
+
         <WaterDropAnimation trigger={showWaterDrop} onComplete={() => setShowWaterDrop(false)} />
 
-        
+     
         {toasts.map((toast) => (
           <Toast
             key={toast.id}

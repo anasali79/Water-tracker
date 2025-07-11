@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Switch } from "@/components/ui/switch"
 import {
   Dialog,
   DialogContent,
@@ -14,7 +15,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { Settings } from "lucide-react"
+import { Settings, Vibrate, Bell, Eye, Clock } from "lucide-react"
 import type { DayData } from "@/types/water"
 
 interface SettingsPanelProps {
@@ -25,8 +26,22 @@ interface SettingsPanelProps {
   setNotificationsEnabled: (enabled: boolean) => void
   reminderInterval: number
   setReminderInterval: (interval: number) => void
+  visualAlertsEnabled?: boolean
+  setVisualAlertsEnabled?: (enabled: boolean) => void
+  vibrationEnabled?: boolean
+  setVibrationEnabled?: (enabled: boolean) => void
+  deviceIsMobile?: boolean
+  deviceSupportsVibration?: boolean
+  notificationSupport?: { supported: boolean; reason: string }
+  nextReminderTime?: Date | null
   onRequestNotificationPermission: () => Promise<boolean>
   onSendTestNotification: (todayData: DayData) => void
+  onUpdateNotificationSettings: (
+    enabled: boolean,
+    interval?: number,
+    visualAlerts?: boolean,
+    vibration?: boolean,
+  ) => void
   todayData: DayData
 }
 
@@ -38,8 +53,17 @@ export function SettingsPanel({
   setNotificationsEnabled,
   reminderInterval,
   setReminderInterval,
+  visualAlertsEnabled = true,
+  setVisualAlertsEnabled,
+  vibrationEnabled = true,
+  setVibrationEnabled,
+  deviceIsMobile = false,
+  deviceSupportsVibration = false,
+  notificationSupport = { supported: true, reason: "Supported" },
+  nextReminderTime,
   onRequestNotificationPermission,
   onSendTestNotification,
+  onUpdateNotificationSettings,
   todayData,
 }: SettingsPanelProps) {
   const [goalInput, setGoalInput] = useState(dailyGoal.toString())
@@ -47,7 +71,6 @@ export function SettingsPanel({
   const handleGoalChange = (value: string) => {
     setGoalInput(value)
 
-    
     const numValue = Number.parseInt(value)
     if (!isNaN(numValue) && numValue >= 500 && numValue <= 5000) {
       setDailyGoal(numValue)
@@ -62,6 +85,20 @@ export function SettingsPanel({
     }
   }
 
+  const formatNextReminderTime = (time: Date | null) => {
+    if (!time) return "Not scheduled"
+    const now = new Date()
+    const diff = time.getTime() - now.getTime()
+    const minutes = Math.floor(diff / (1000 * 60))
+
+    if (minutes <= 0) return "Due now"
+    if (minutes < 60) return `In ${minutes} minutes`
+
+    const hours = Math.floor(minutes / 60)
+    const remainingMinutes = minutes % 60
+    return `In ${hours}h ${remainingMinutes}m`
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -70,7 +107,8 @@ export function SettingsPanel({
           Settings
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-6">
+      
         <div className="space-y-2">
           <Label htmlFor="daily-goal">Daily Goal (ml)</Label>
           <Input
@@ -89,41 +127,41 @@ export function SettingsPanel({
         </div>
 
         <div className="space-y-4 pt-4 border-t">
-          <h3 className="font-semibold">Notification Reminders</h3>
+          <div className="flex items-center gap-2">
+            <Bell className="h-5 w-5" />
+            <h3 className="font-semibold">Notification Reminders</h3>
+          </div>
 
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <Label>Enable Reminders</Label>
-                <p className="text-sm text-gray-600">Get notified to drink water regularly</p>
-              </div>
-              <Button
-                variant={notificationsEnabled ? "default" : "outline"}
-                size="sm"
-                onClick={async () => {
-                  if (!notificationsEnabled) {
-                    if ("Notification" in window) {
-                      const permission = await Notification.requestPermission()
-                      if (permission === "granted") {
-                        setNotificationsEnabled(true)
-                        alert("Notifications enabled! You'll get reminders based on your selected interval.")
-                      } else {
-                        alert("Please allow notifications in your browser settings to enable reminders.")
-                      }
-                    } else {
-                      alert("Your browser doesn't support notifications.")
-                    }
-                  } else {
-                    setNotificationsEnabled(false)
-                    localStorage.setItem("waterTrackerNotifications", "false")
-                  }
-                }}
-              >
-                {notificationsEnabled ? "Enabled ✓" : "Enable"}
-              </Button>
+          
+          <div className="flex items-center justify-between">
+            <div>
+              <Label>Enable Reminders</Label>
+              <p className="text-sm text-gray-600">Get reminded to drink water regularly</p>
             </div>
+            <Switch
+              checked={notificationsEnabled}
+              onCheckedChange={async (enabled) => {
+                if (enabled && notificationSupport.supported) {
+                  const permission = await onRequestNotificationPermission()
+                  if (permission) {
+                    onUpdateNotificationSettings(true)
+                    setNotificationsEnabled(true)
+                  } else {
+                  
+                    onUpdateNotificationSettings(true)
+                    setNotificationsEnabled(true)
+                  }
+                } else {
+                  onUpdateNotificationSettings(enabled)
+                  setNotificationsEnabled(enabled)
+                }
+              }}
+            />
+          </div>
 
-            {notificationsEnabled && (
+          {notificationsEnabled && (
+            <div className="space-y-4 pl-4 border-l-2 border-blue-200">
+          
               <div className="space-y-2">
                 <Label htmlFor="reminder-interval">Reminder Interval</Label>
                 <Select
@@ -131,7 +169,7 @@ export function SettingsPanel({
                   onValueChange={(value) => {
                     const interval = Number.parseInt(value)
                     setReminderInterval(interval)
-                    localStorage.setItem("waterTrackerReminderInterval", interval.toString())
+                    onUpdateNotificationSettings(notificationsEnabled, interval)
                   }}
                 >
                   <SelectTrigger>
@@ -146,21 +184,76 @@ export function SettingsPanel({
                   </SelectContent>
                 </Select>
 
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => onSendTestNotification(todayData)}
-                  className="w-full mt-2 bg-transparent"
-                >
-                  🔔 Test Notification
-                </Button>
-
-                <div className="text-xs text-gray-500 mt-2">Next reminder: Every {reminderInterval} minutes</div>
+                {nextReminderTime && (
+                  <div className="flex items-center gap-2 text-xs text-gray-500">
+                    <Clock className="h-3 w-3" />
+                    <span>Next reminder: {formatNextReminderTime(nextReminderTime)}</span>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+
+              
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Eye className="h-4 w-4" />
+                  <div>
+                    <Label className="text-sm">Visual Alerts</Label>
+                    <p className="text-xs text-gray-600">
+                      Show popup reminders {deviceIsMobile ? "(Recommended for mobile)" : ""}
+                    </p>
+                  </div>
+                </div>
+                <Switch
+                  checked={visualAlertsEnabled}
+                  onCheckedChange={(enabled) => {
+                    setVisualAlertsEnabled?.(enabled)
+                    onUpdateNotificationSettings(notificationsEnabled, reminderInterval, enabled)
+                  }}
+                />
+              </div>
+
+           
+              {deviceSupportsVibration && (
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Vibrate className="h-4 w-4" />
+                    <div>
+                      <Label className="text-sm">Vibration</Label>
+                      <p className="text-xs text-gray-600">Vibrate device for reminders</p>
+                    </div>
+                  </div>
+                  <Switch
+                    checked={vibrationEnabled}
+                    onCheckedChange={(enabled) => {
+                      setVibrationEnabled?.(enabled)
+                      onUpdateNotificationSettings(notificationsEnabled, reminderInterval, visualAlertsEnabled, enabled)
+                    }}
+                  />
+                </div>
+              )}
+
+             
+              <Button variant="outline" size="sm" onClick={() => onSendTestNotification(todayData)} className="w-full">
+                🔔 Test All Notifications
+              </Button>
+
+           
+              {deviceIsMobile && (
+                <div className="bg-blue-50 p-3 rounded-lg">
+                  <div className="text-sm font-medium text-blue-800 mb-1">📱 Mobile Tips:</div>
+                  <ul className="text-xs text-blue-700 space-y-1">
+                    <li>• Keep this tab open for best results</li>
+                    <li>• Add to home screen for PWA experience</li>
+                    <li>• Visual alerts work even if browser notifications don't</li>
+                    {deviceSupportsVibration && <li>• Vibration works in most mobile browsers</li>}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
+        
         <div className="pt-4 border-t">
           <Dialog>
             <DialogTrigger asChild>
